@@ -318,7 +318,7 @@ export default function App() {
               style={{ filter: `drop-shadow(0 0 4px ${S.color})` }} />
           </svg>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".12em", color: "#e8f0ff" }}>HELIXMIND</div>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".12em", color: "#e8f0ff" }}>Group 3</div>
             <div style={{ fontSize: 8, color: "#2a3d55", letterSpacing: ".18em" }}>CARDIAC TRIAGE SYSTEM</div>
           </div>
         </div>
