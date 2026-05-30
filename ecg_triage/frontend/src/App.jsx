@@ -14,14 +14,12 @@ const SEV = {
 
 /* ── Always-on scrolling ECG ─────────────────────────────────────────────── */
 function ECGCanvas({ data, sev }) {
-  const ref    = useRef(null);
-  const buf    = useRef([]);
-  const raf    = useRef(0);
-  const pos    = useRef(0);   // current draw head (0..W)
-  const offset = useRef(0);   // synthetic beat phase
-  const c      = SEV[sev]?.color || "#0affb2";
+  const ref   = useRef(null);
+  const buf   = useRef([]);
+  const raf   = useRef(0);
+  const phase = useRef(0);
+  const c     = SEV[sev]?.color || "#0affb2";
 
-  // Feed real signal into buffer whenever it arrives
   useEffect(() => {
     if (data?.length) buf.current = [...buf.current, ...data].slice(-2048);
   }, [data]);
@@ -31,87 +29,62 @@ function ECGCanvas({ data, sev }) {
     const ctx = cv.getContext("2d");
     const W = cv.width, H = cv.height;
 
-    // Persistent back-buffer so we can scroll without full redraw
-    const back = document.createElement("canvas");
-    back.width = W; back.height = H;
-    const bctx = back.getContext("2d");
-
-    function beat(x, off) {
-      const t = ((x + off) % 220) / 220;
-      if (t < .09) return 0;
-      if (t < .13) return -.12;
-      if (t < .15) return 0;
-      if (t < .17) return 1;
-      if (t < .19) return -.25;
-      if (t < .21) return 0;
-      if (t < .38) return .15 * Math.sin((t - .21) / .17 * Math.PI);
+    function beat(t) {
+      if (t < .09)  return 0;
+      if (t < .13)  return -0.12;
+      if (t < .15)  return 0;
+      if (t < .175) return 1.0;
+      if (t < .20)  return -0.28;
+      if (t < .22)  return 0;
+      if (t < .40)  return 0.18 * Math.sin((t - .22) / .18 * Math.PI);
       return 0;
     }
 
-    const SPEED = 2; // pixels per frame
+    function sample(px) {
+      const b = buf.current;
+      const t = ((px / W) + phase.current) % 1;
+      if (b.length >= 64) {
+        return b[Math.floor(t * b.length)];
+      }
+      return beat(t) + (Math.random() - .5) * .018;
+    }
 
     function frame() {
-      // Scroll back-buffer left by SPEED pixels
-      bctx.clearRect(0, 0, SPEED, H);
-      bctx.drawImage(back, SPEED, 0, W - SPEED, H, 0, 0, W - SPEED, H);
-      bctx.clearRect(W - SPEED, 0, SPEED, H);
+      phase.current = (phase.current + 0.0012) % 1;
 
-      // Draw new column on the right edge
-      for (let dx = 0; dx < SPEED; dx++) {
-        const px = W - SPEED + dx;
+      ctx.clearRect(0, 0, W, H);
 
-        // grid dots
-        if (px % 50 === 0) {
-          bctx.strokeStyle = "#ffffff08";
-          bctx.lineWidth = 1;
-          bctx.beginPath(); bctx.moveTo(px, 0); bctx.lineTo(px, H); bctx.stroke();
-        }
-
-        // signal sample
-        let v;
-        const b = buf.current;
-        if (b.length > 0) {
-          const idx = pos.current % b.length;
-          v = b[Math.floor(idx)];
-          pos.current += 0.8;
-        } else {
-          v = beat(px, offset.current) + (Math.random() - .5) * .02;
-          offset.current = (offset.current + SPEED) % 220;
-        }
-
-        const y  = H / 2 - v * H * .38;
-        const y0 = H / 2;
-
-        // glow trace
-        bctx.strokeStyle = c + "40";
-        bctx.lineWidth = 4;
-        bctx.shadowBlur = 0;
-        bctx.beginPath(); bctx.moveTo(px, y0); bctx.lineTo(px, y); bctx.stroke();
-
-        // sharp line
-        bctx.strokeStyle = c;
-        bctx.lineWidth = 1.5;
-        bctx.shadowColor = c;
-        bctx.shadowBlur = 10;
-        bctx.beginPath(); bctx.moveTo(px, y0); bctx.lineTo(px, y); bctx.stroke();
-        bctx.shadowBlur = 0;
+      // grid
+      ctx.strokeStyle = "#ffffff07";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= W; x += 50) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+      for (let y = 0; y <= H; y += H / 4) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
       }
 
-      // Horizontal baseline
-      bctx.strokeStyle = "#ffffff06";
-      bctx.lineWidth = 1;
-      bctx.beginPath(); bctx.moveTo(0, H / 2); bctx.lineTo(W, H / 2); bctx.stroke();
+      // glow pass
+      ctx.beginPath();
+      ctx.strokeStyle = c + "28";
+      ctx.lineWidth = 7;
+      ctx.lineJoin = "round";
+      for (let px = 0; px <= W; px += 2) {
+        const y = H / 2 - sample(px) * H * .36;
+        px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+      }
+      ctx.stroke();
 
-      // Composite to visible canvas
-      ctx.clearRect(0, 0, W, H);
-      ctx.drawImage(back, 0, 0);
-
-      // Scan-head glow at right edge
-      const grad = ctx.createLinearGradient(W - 24, 0, W, 0);
-      grad.addColorStop(0, "transparent");
-      grad.addColorStop(1, c + "18");
-      ctx.fillStyle = grad;
-      ctx.fillRect(W - 24, 0, 24, H);
+      // sharp line
+      ctx.beginPath();
+      ctx.strokeStyle = c;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      for (let px = 0; px <= W; px += 2) {
+        const y = H / 2 - sample(px) * H * .36;
+        px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+      }
+      ctx.stroke();
 
       raf.current = requestAnimationFrame(frame);
     }
