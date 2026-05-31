@@ -178,6 +178,10 @@ export default function App() {
   const [datFile, setDatFile]   = useState(null);
   const [heaFile, setHeaFile]   = useState(null);
   const [ptbLabel, setPtbLabel] = useState("Normal");
+  const [csvFile, setCsvFile]   = useState(null);
+  const [csvCol, setCsvCol]     = useState("ecg_value");
+  const [csvFs, setCsvFs]       = useState("0");
+  const [csvLabel, setCsvLabel] = useState("Normal");
 
   // continuous demo mode state
   const [demoRunning, setDemoRunning] = useState(false);
@@ -319,7 +323,7 @@ export default function App() {
           </svg>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".12em", color: "#e8f0ff" }}>Group 3</div>
-            <div style={{ fontSize: 8, color: "#2a3d55", letterSpacing: ".18em" }}>CARDIAC TRIAGE SYSTEM</div>
+            <div style={{ fontSize: 8, color: "#2a3d55", letterSpacing: ".18em" }}>SYSTEM</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
@@ -372,6 +376,7 @@ export default function App() {
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           <Tab label="SYNTHETIC DEMO" active={tab === "demo"} onClick={() => setTab("demo")} />
           <Tab label="PTB-XL WFDB"   active={tab === "wfdb"} onClick={() => setTab("wfdb")} dot={!datFile && tab !== "wfdb"} />
+          <Tab label="CSV UPLOAD"     active={tab === "csv"}  onClick={() => setTab("csv")}  dot={!csvFile && tab !== "csv"} />
         </div>
 
         {/* demo controls */}
@@ -487,6 +492,68 @@ export default function App() {
               <div style={{ marginTop: 14, fontSize: 9, color: "#1a2d45", letterSpacing: ".08em" }}>
                 AVAILABLE LEADS: {result.all_leads.join(" · ")} · SOURCE: {result.source_fs} Hz
                 {demoRunning && <span style={{ color: "#0affb2", marginLeft: 12 }}>● AUTO-REFRESHING</span>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CSV upload */}
+        {tab === "csv" && (
+          <div style={{ background:"#080e1a", border:"1px solid #111d2e", borderRadius:10, padding:"20px 22px", marginBottom:20 }}>
+            <div style={{ fontSize:9, color:"#1a2d45", letterSpacing:".16em", marginBottom:16, fontWeight:600 }}>
+              CSV ECG UPLOAD — ANY FORMAT WITH ECG SIGNAL COLUMN
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr auto", gap:12, alignItems:"end" }}>
+              <div>
+                <div style={{ fontSize:9, color:"#1a2d45", letterSpacing:".12em", marginBottom:6, fontWeight:600 }}>CSV FILE</div>
+                <label style={{
+                  display:"flex", alignItems:"center", gap:8,
+                  background:"#05080f", border:`1px dashed ${csvFile?"#0affb250":"#111d2e"}`,
+                  borderRadius:8, padding:"9px 12px", cursor:"pointer",
+                  fontSize:10, color:csvFile?"#0affb2":"#2a3d55", transition:"all .2s",
+                }}>
+                  <span>{csvFile ? "✓" : "+"}</span>
+                  <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:160 }}>
+                    {csvFile ? csvFile.name : "choose .csv"}
+                  </span>
+                  <input type="file" accept=".csv,.txt" style={{ display:"none" }}
+                    onChange={e => setCsvFile(e.target.files[0] || null)} />
+                </label>
+              </div>
+              <div>
+                <div style={{ fontSize:9, color:"#1a2d45", letterSpacing:".12em", marginBottom:6, fontWeight:600 }}>ECG COLUMN</div>
+                <input value={csvCol} onChange={e => setCsvCol(e.target.value)}
+                  placeholder="ecg_value" style={{ ...sel, width:"100%" }} />
+              </div>
+              <div>
+                <div style={{ fontSize:9, color:"#1a2d45", letterSpacing:".12em", marginBottom:6, fontWeight:600 }}>SAMPLE RATE Hz</div>
+                <input value={csvFs} onChange={e => setCsvFs(e.target.value)}
+                  placeholder="0 = auto" style={{ ...sel, width:"100%" }} />
+              </div>
+              <div>
+                <div style={{ fontSize:9, color:"#1a2d45", letterSpacing:".12em", marginBottom:6, fontWeight:600 }}>LABEL</div>
+                <select value={csvLabel} onChange={e => setCsvLabel(e.target.value)} style={sel}>
+                  {SCENARIOS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize:9, color:"#1a2d45", letterSpacing:".12em", marginBottom:6, fontWeight:600 }}>DEVICE</div>
+                <select value={device} onChange={e => setDevice(e.target.value)} style={sel}>
+                  {DEVICES.map(d => <option key={d} value={d}>{d.replace(/_/g," ")}</option>)}
+                </select>
+              </div>
+              <button onClick={runCsv} disabled={!csvFile || loading} style={{
+                padding:"10px 22px", borderRadius:8, fontSize:10, fontWeight:700,
+                letterSpacing:".1em", border:"1px solid #0affb230",
+                background: !csvFile || loading ? "#080e1a" : "#0affb214",
+                color:"#0affb2", cursor: !csvFile || loading ? "not-allowed" : "pointer",
+                fontFamily:"inherit", textShadow:"0 0 12px #0affb266",
+              }}>{loading ? "…" : "ANALYSE"}</button>
+            </div>
+            {result?.detected_fs && (
+              <div style={{ marginTop:14, fontSize:9, color:"#1a2d45", letterSpacing:".08em" }}>
+                DETECTED: {result.detected_fs} Hz · {result.duration_sec}s · {result.n_samples} samples · COL: {result.ecg_col_used}
+                {demoRunning && <span style={{ color:"#0affb2", marginLeft:12 }}>● AUTO-REFRESHING</span>}
               </div>
             )}
           </div>
