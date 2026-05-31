@@ -278,10 +278,37 @@ export default function App() {
   }
 
   // stop everything on unmount or tab change
-  useEffect(() => () => {
-    clearInterval(demoRef.current);
-    sseRef.current?.close();
-  }, []);
+  async function runCsv() {
+    if (!csvFile) { setError("Upload a CSV file"); return; }
+    setLoading(true); setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file",    csvFile);
+      fd.append("ecg_col", csvCol);
+      fd.append("src_fs",  csvFs);
+      fd.append("label",   csvLabel);
+      fd.append("device",  device);
+      const r = await fetch(`${API_BASE}/triage/csv`, { method: "POST", body: fd });
+      if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
+      const data = await r.json();
+      apply(data);
+      clearInterval(demoRef.current);
+      demoRef.current = setInterval(async () => {
+        try {
+          const fd2 = new FormData();
+          fd2.append("file",    csvFile);
+          fd2.append("ecg_col", csvCol);
+          fd2.append("src_fs",  csvFs);
+          fd2.append("label",   csvLabel);
+          fd2.append("device",  device);
+          const r2 = await fetch(`${API_BASE}/triage/csv`, { method: "POST", body: fd2 });
+          if (r2.ok) apply(await r2.json());
+        } catch (_) {}
+      }, 4000);
+      setDemoRunning(true);
+    } catch (e) { setError(e.message); }
+    finally     { setLoading(false); }
+  }
 
   // stop continuous when scenario/device changes
   useEffect(() => {
